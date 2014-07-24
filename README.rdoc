@@ -5,6 +5,22 @@
 
 Re:VIEW is an easy-to-use digital publishing system for books and ebooks.
 
+== 高見知英独自カスタマイズ部分
+
+* Windowsコマンドプロンプトからでも実行できるように、binフォルダに各種コマンドと同名のbatファイルを作成しました。
+
+Windows上でRe:VIEWを動かす場合は、以下の通りのセットアップ作業を行ってください。
+
+1. Windows上にGitおよび、Gitクライアントをインストールする
+1. 任意のフォルダ(半角スペースや日本語を含まないフォルダが無難です)にこのリポジトリをクローンする
+1. Rubyをインストールする(Cygwin版でも、Windows用バイナリでもどちらでも構いません。自分は他のツールとの兼ね合いからCygwin版を使用しています)。
+1. Rubyおよび、Re:VIEWのbinフォルダにパスを通し(環境変数PATHを設定し)、コマンドプロンプトから、「ruby」と打つとrubyが、「review-compile -v」と打つとreviewのバージョンが表示されるようにする。
+
+詳しくはQiitaの記事を参照ください。
+(GinnieにReVIEWエディタ機能を組み込む-Qiita)[http://qiita.com/TakamiChie/items/c54fff5938d4365d241c]
+
+また、本家のRe:VIEWよりバージョンが古い場合があります。気付いた点などあればTwitterの@TakamiChieまで連絡してください。
+
 == Format
 
 Re:VIEW uses its original format('Re:VIEW format') as source files. See doc/format.rdoc (in Japanese).
