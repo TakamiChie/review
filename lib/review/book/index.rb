@@ -296,7 +296,8 @@ module ReVIEW
         headlines = []
         src.each do |line|
           if m = HEADLINE_PATTERN.match(line)
-            next if m[2] == 'column'
+            next if m[1].size > 10 # Ignore too deep index
+            next if m[2] == 'column' ||  m[2] == '/column'
             index = m[1].size - 2
             if index >= 0
               if indexs.size > (index + 1)
