@@ -186,21 +186,21 @@ module ReVIEW
     end
 
     def inline_chapref(id)
-      compile_inline @chapter.env.chapter_index.display_string(id)
+      compile_inline @book.chapter_index.display_string(id)
     rescue KeyError
       error "unknown chapter: #{id}"
       nofunc_text("[UnknownChapter:#{id}]")
     end
 
     def inline_chap(id)
-      @chapter.env.chapter_index.number(id)
+      @book.chapter_index.number(id)
     rescue KeyError
       error "unknown chapter: #{id}"
       nofunc_text("[UnknownChapter:#{id}]")
     end
 
     def inline_title(id)
-      compile_inline @chapter.env.chapter_index.title(id)
+      compile_inline @book.chapter_index.title(id)
     rescue KeyError
       error "unknown chapter: #{id}"
       nofunc_text("[UnknownChapter:#{id}]")
@@ -218,6 +218,16 @@ module ReVIEW
     rescue KeyError
       error "unknown image: #{id}"
       nofunc_text("[UnknownImage:#{id}]")
+    end
+
+    def inline_imgref(id)
+      img = inline_img(id)
+
+      if @chapter.image(id).caption
+        "#{img}#{I18n.t('image_quote', @chapter.image(id).caption)}"
+      else
+        img
+      end
     end
 
     def inline_table(id)

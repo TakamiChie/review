@@ -24,6 +24,7 @@ class LATEXBuidlerTest < Test::Unit::TestCase
     @chapter = Book::Chapter.new(@book, 1, 'chap1', nil, StringIO.new)
     location = Location.new(nil, nil)
     @builder.bind(@compiler, @chapter, location)
+    I18n.setup("ja")
   end
 
   def test_headline_level1
@@ -635,6 +636,30 @@ EOS
   def test_inline_endash
     actual = compile_inline("- -- --- ----")
     assert_equal "{-} {-}{-} {-}{-}{-} {-}{-}{-}{-}", actual
+  end
+
+  def test_inline_imgref
+    def @chapter.image(id)
+      item = Book::ImageIndex::Item.new("sampleimg", 1, 'sample photo')
+      item.instance_eval{@path="./images/chap1-sampleimg.png"}
+      item
+    end
+
+    actual = compile_block "@<imgref>{sampleimg}\n"
+    expected = "\n\\reviewimageref{1.1}{image:chap1:sampleimg}「sample photo」\n"
+    assert_equal expected, actual
+  end
+
+  def test_inline_imgref2
+    def @chapter.image(id)
+      item = Book::NumberlessImageIndex::Item.new("sampleimg", 1)
+      item.instance_eval{@path="./images/chap1-sampleimg.png"}
+      item
+    end
+
+    actual = compile_block "@<imgref>{sampleimg}\n"
+    expected = "\n\\reviewimageref{1.1}{image:chap1:sampleimg}\n"
+    assert_equal expected, actual
   end
 
   def test_block_raw0

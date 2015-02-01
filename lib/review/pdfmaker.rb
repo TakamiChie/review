@@ -1,6 +1,6 @@
 # encoding: utf-8
 #
-# Copyright (c) 2010-2014 Kenshi Muto and Masayoshi Takahashi
+# Copyright (c) 2010-2015 Kenshi Muto and Masayoshi Takahashi
 #
 # This program is free software.
 # You can distribute or modify this program under the terms of
@@ -37,9 +37,7 @@ module ReVIEW
 
     def check_book(config)
       pdf_file = config["bookname"]+".pdf"
-      if File.exist? pdf_file
-        error "file already exists:#{pdf_file}"
-      end
+      File.unlink(pdf_file) if File.exist?(pdf_file)
     end
 
     def build_path(config)
@@ -93,10 +91,11 @@ module ReVIEW
       config.merge!(YAML.load_file(yamlfile))
       # YAML configs will be overridden by command line options.
       config.merge!(cmd_config)
-      generate_pdf(config)
+      I18n.setup(config["language"])
+      generate_pdf(config, yamlfile)
     end
 
-    def generate_pdf(config)
+    def generate_pdf(config, yamlfile)
       check_book(config)
       @basedir = Dir.pwd
       @path = build_path(config)
@@ -106,10 +105,12 @@ module ReVIEW
       @chaps_fnames = Hash.new{|h, key| h[key] = ""}
       @compile_errors = nil
 
-      ReVIEW::Book.load(@basedir).parts.each do |part|
+      book = ReVIEW::Book.load(@basedir)
+      book.config = config
+      book.parts.each do |part|
         if part.name.present?
           if part.file?
-            output_parts(part.name, config)
+            output_chaps(part.name, config, yamlfile)
             @chaps_fnames["CHAPS"] << %Q|\\input{#{part.name}.tex}\n|
           else
             @chaps_fnames["CHAPS"] << %Q|\\part{#{part.name}}\n|
@@ -117,12 +118,12 @@ module ReVIEW
         end
 
         part.chapters.each do |chap|
-          filename = "#{File.basename(chap.path, ".*")}.tex"
-          output_chaps(filename, config)
-          @chaps_fnames["PREDEF"]  << "\\input{#{filename}}\n" if chap.on_PREDEF?
-          @chaps_fnames["CHAPS"]   << "\\input{#{filename}}\n" if chap.on_CHAPS?
-          @chaps_fnames["APPENDIX"] << "\\input{#{filename}}\n" if chap.on_APPENDIX?
-          @chaps_fnames["POSTDEF"] << "\\input{#{filename}}\n" if chap.on_POSTDEF?
+          filename = File.basename(chap.path, ".*")
+          output_chaps(filename, config, yamlfile)
+          @chaps_fnames["PREDEF"]  << "\\input{#{filename}.tex}\n" if chap.on_PREDEF?
+          @chaps_fnames["CHAPS"]   << "\\input{#{filename}.tex}\n" if chap.on_CHAPS?
+          @chaps_fnames["APPENDIX"] << "\\input{#{filename}.tex}\n" if chap.on_APPENDIX?
+          @chaps_fnames["POSTDEF"] << "\\input{#{filename}.tex}\n" if chap.on_POSTDEF?
         end
       end
 
@@ -140,6 +141,8 @@ module ReVIEW
 
       copy_images("./images", "#{@path}/images")
       copyStyToDir(Dir.pwd + "/sty", @path)
+      copyStyToDir(Dir.pwd + "/sty", @path, "fd")
+      copyStyToDir(Dir.pwd + "/sty", @path, "cls")
       copyStyToDir(Dir.pwd, @path, "tex")
 
       Dir.chdir(@path) {
@@ -149,15 +152,28 @@ module ReVIEW
         ## do compile
         enc = config["params"].to_s.split(/\s+/).find{|i| i =~ /\A--outencoding=/ }
         kanji = 'utf8'
-        if enc
-          kanji = enc.split(/\=/).last.gsub(/-/, '').downcase
+        texcommand = "platex"
+        texoptions = "-kanji=#{kanji}"
+        dvicommand = "dvipdfmx"
+        dvioptions = "-d 5"
+
+        if ENV["REVIEW_SAFE_MODE"].to_i & 4 > 0
+          warn "command configuration is prohibited in safe mode. ignored."
+        else
+          texcommand = config["texcommand"] if config["texcommand"]
+          dvicommand = config["dvicommand"] if config["dvicommand"]
+          dvioptions = config["dvioptions"] if config["dvioptions"]
+          if enc
+            kanji = enc.split(/\=/).last.gsub(/-/, '').downcase
+            texoptions = "-kanji=#{kanji}"
+          end
+          texoptions = config["texoptions"] if config["texoptions"]
         end
-        texcommand = config["texcommand"] || "platex"
         3.times do
-          system_or_raise("#{texcommand} -kanji=#{kanji} book.tex")
+          system_or_raise("#{texcommand} #{texoptions} book.tex")
         end
         if File.exist?("book.dvi")
-          system_or_raise("dvipdfmx -d 5 book.dvi")
+          system_or_raise("#{dvicommand} #{dvioptions} book.dvi")
         end
       }
       FileUtils.cp("#{@path}/book.pdf", "#{@basedir}/#{bookname}.pdf")
@@ -167,20 +183,9 @@ module ReVIEW
       end
     end
 
-    def output_chaps(filename, config)
-      $stderr.puts "compiling #{filename}"
-      cmd = "#{ReVIEW::MakerHelper.bindir}/review-compile --target=latex --level=#{config["secnolevel"]} --toclevel=#{config["toclevel"]} #{config["params"]} #{filename} > #{@path}/#{filename}"
-      if system cmd
-        # OK
-      else
-        @compile_errors = true
-        warn cmd
-      end
-    end
-
-    def output_parts(filename, config)
+    def output_chaps(filename, config, yamlfile)
       $stderr.puts "compiling #{filename}.tex"
-      cmd = "review-compile --target=latex --level=#{config["secnolevel"]} --toclevel=#{config["toclevel"]} #{config["params"]} #{filename}.re | sed -e s/\\chapter{/\\part{/ > #{@path}/#{filename}.tex"
+      cmd = "#{ReVIEW::MakerHelper.bindir}/review-compile --yaml=#{yamlfile} --target=latex --level=#{config["secnolevel"]} --toclevel=#{config["toclevel"]} #{config["params"]} #{filename}.re > #{@path}/#{filename}.tex"
       if system cmd
         # OK
       else
@@ -188,7 +193,6 @@ module ReVIEW
         warn cmd
       end
     end
-
 
     def copy_images(from, to)
       if File.exist?(from)
@@ -198,6 +202,7 @@ module ReVIEW
           images = Dir.glob("**/*").find_all{|f|
             File.file?(f) and f =~ /\.(jpg|jpeg|png|pdf)\z/
           }
+          break if images.empty?
           system("extractbb", *images)
           unless system("extractbb", "-m", *images)
             system_or_raise("ebb", *images)
@@ -242,13 +247,16 @@ module ReVIEW
     def make_authors(config)
       authors = ""
       if config["aut"].present?
-        authors = join_with_separator(config["aut"], ReVIEW::I18n.t("names_splitter")) + ReVIEW::I18n.t("author_postfix")
+        author_names = join_with_separator(config["aut"], ReVIEW::I18n.t("names_splitter"))
+        authors = ReVIEW::I18n.t("author_with_label", author_names)
       end
       if config["csl"].present?
-        authors += " \\\\\n"+join_with_separator(config["csl"], ReVIEW::I18n.t("names_splitter")) + ReVIEW::I18n.t("supervisor_postfix")
+        csl_names = join_with_separator(config["csl"], ReVIEW::I18n.t("names_splitter"))
+        authors += " \\\\\n"+ ReVIEW::I18n.t("supervisor_with_label", csl_names)
       end
       if config["trl"].present?
-        authors += " \\\\\n"+join_with_separator(config["trl"], ReVIEW::I18n.t("names_splitter")) + ReVIEW::I18n.t("translator_postfix")
+        trl_names = join_with_separator(config["trl"], ReVIEW::I18n.t("names_splitter"))
+        authors += " \\\\\n"+ ReVIEW::I18n.t("translator_with_label", trl_names)
       end
       authors
     end

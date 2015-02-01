@@ -5,7 +5,7 @@ module ReVIEW
       Configure[
         # These parameters can be overridden by YAML file.
         "bookname"=> "example", # it defines epub file name also
-        "booktitle" => "Re:VIEW EPUBサンプル",
+        "booktitle" => "Re:VIEW Sample Book",
         "title" => nil,
         "aut" => nil, # author
         "prt" => nil, # printer(publisher)
@@ -30,7 +30,7 @@ module ReVIEW
         "posthook" => nil, # command path of post hook
         "epubversion" => 2,
         "titlepage" => true, # Use title page
-        "toc" => true, # Use table of contents
+        "toc" => nil, # Use table of contents in body
         "colophon" => nil, # Use colophon
         "debug" => nil, # debug flag
         "catalogfile" => 'catalog.yml',
